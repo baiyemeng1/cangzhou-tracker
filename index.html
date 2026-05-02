@@ -32,10 +32,9 @@
     }
     .status.off { background: #fee2e2; color: #991b1b; }
 
-    /* 🌟 按钮移到右下角，与缩放控件错开 */
     .control-btn {
       position: fixed;
-      bottom: 140px;   /* 放在右下角，高于底部信息卡片 */
+      bottom: 140px;   /* 避开缩放控件和底部卡片 */
       right: 15px;
       background: white;
       border: none;
@@ -64,30 +63,29 @@
 
   <script>
     // ========== 固定学校位置 ==========
-    const FIXED_POSITION = [38.38998, 117.32044];
+    const FIXED_POSITION = [38.38, 117.33];
     const FIXED_LABEL = "学校";
 
-    // 初始化地图，缩放控件留在右上角（默认）
+    // 初始化地图，缩放控件放在右上角
     const map = L.map('map', {
       center: FIXED_POSITION,
       zoom: 16,
-      zoomControl: false  // 我们手动添加，控制位置
+      zoomControl: false
     });
-    // 把缩放控件放在右上角
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // 🌟 更换底图为带建筑轮廓的人道主义图层
+    // 使用带建筑轮廓的人道主义风格底图
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors, Humanitarian style',
       maxZoom: 19
     }).addTo(map);
 
     // 学校固定标记
-    const fixedMarker = L.marker(FIXED_POSITION)
+    L.marker(FIXED_POSITION)
       .addTo(map)
       .bindPopup(`<b>${FIXED_LABEL}</b><br>学院西路2009号沧州交通学院`);
 
-    // 用户实时位置图标
+    // 用户实时位置图标（蓝色圆点）
     const userIcon = L.divIcon({
       className: 'user-marker',
       html: '<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(59,130,246,0.6);"></div>',
@@ -110,7 +108,7 @@
       statusEl.className = active ? 'status' : 'status off';
     }
 
-    // 位置更新
+    // 位置更新回调
     function updatePosition(position) {
       const { latitude, longitude } = position.coords;
       const newPoint = [latitude, longitude];
@@ -125,17 +123,15 @@
       setGPSStatus(true);
     }
 
+    // 定位失败处理（不弹窗，仅显示未定位）
     function handleLocationError(err) {
       console.warn('定位错误:', err.message);
       setGPSStatus(false);
-      // 只有在用户主动拒绝时才提示，其他情况也显示未定位
     }
 
     // 启动位置监听
-    let watchId = null;
     if ('geolocation' in navigator) {
-      // 如果已授权但之前失败，可能是权限问题，这里静默处理，不弹窗
-      watchId = navigator.geolocation.watchPosition(
+      navigator.geolocation.watchPosition(
         updatePosition,
         handleLocationError,
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }

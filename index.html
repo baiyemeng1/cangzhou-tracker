@@ -108,10 +108,28 @@
       statusEl.className = active ? 'status' : 'status off';
     }
 
-    // 位置更新回调
+    // 位置更新回调（带距离过滤，小于5米不记录轨迹）
     function updatePosition(position) {
       const { latitude, longitude } = position.coords;
       const newPoint = [latitude, longitude];
+
+      // 🎯 过滤漂移：与上一个已记录点的距离不足5米，就忽略本次更新
+      if (trailCoords.length > 0) {
+        const prevPoint = trailCoords[trailCoords.length - 1];
+        const distance = map.distance(prevPoint, newPoint); // 单位：米
+        if (distance < 5) {
+          // 距离太近，只更新用户位置图标，但不记入轨迹
+          if (userMarker) {
+            userMarker.setLatLng(newPoint);
+          } else {
+            userMarker = L.marker(newPoint, { icon: userIcon }).addTo(map);
+          }
+          setGPSStatus(true);
+          return; // 跳过轨迹记录
+        }
+      }
+
+      // 距离足够远，记录轨迹
       trailCoords.push(newPoint);
       trailLine.setLatLngs(trailCoords);
 

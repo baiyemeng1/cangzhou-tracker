@@ -1,190 +1,149 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>沧州交通学院 · 赵雨轩</title>
+  <title>设备轨迹 · 赵雨轩</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="manifest" href="manifest.json" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body, html { height: 100%; width: 100%; font-family: 'Segoe UI', system-ui, sans-serif; }
-    #map { height: 100%; width: 100%; }
-
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body, html, #map { height:100%; width:100%; }
     .info-card {
-      position: fixed; bottom: 20px; left: 15px; right: 15px;
+      position: fixed; bottom:20px; left:15px; right:15px;
       background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
-      border-radius: 16px; padding: 12px 15px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000;
-      display: flex; align-items: center; gap: 12px;
+      border-radius:16px; padding:12px 15px; z-index:1000;
+      box-shadow:0 4px 20px rgba(0,0,0,0.15);
+      display:flex; align-items:center; gap:12px;
     }
     .avatar {
-      width: 48px; height: 48px; border-radius: 50%; background: #3b82f6;
-      color: white; display: flex; align-items: center; justify-content: center;
-      font-weight: bold; font-size: 20px; flex-shrink: 0;
+      width:48px; height:48px; border-radius:50%; background:#3b82f6;
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-size:20px; font-weight:bold; flex-shrink:0;
     }
-    .info-text h3 { font-size: 16px; color: #1e293b; margin-bottom: 2px; }
-    .info-text p { font-size: 13px; color: #475569; }
-    .status {
-      margin-left: auto; font-size: 12px; padding: 4px 10px;
-      border-radius: 20px; background: #dcfce7; color: #166534;
-    }
-    .status.off { background: #fee2e2; color: #991b1b; }
-
-    .control-btn {
-      position: fixed;
-      bottom: 140px;   /* 避开缩放控件和底部卡片 */
-      right: 15px;
-      background: white;
-      border: none;
-      border-radius: 50%;
-      width: 40px; height: 40px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      font-size: 20px; z-index: 1001;
-      cursor: pointer;
-    }
+    .info-text h3 { font-size:16px; margin-bottom:2px; }
+    .info-text p { font-size:13px; color:#475569; }
   </style>
 </head>
 <body>
   <div id="map"></div>
-
-  <div class="info-card" id="infoCard">
+  <div class="info-card">
     <div class="avatar">赵</div>
     <div class="info-text">
       <h3>赵雨轩</h3>
-      <p>📞 15076904222</p>
-      <p>📍 学院西路2009号沧州交通学院</p>
+      <p>📍 家：学院西路2009号沧州交通学院</p>
+      <p id="statusText">📡 连接中...</p>
     </div>
-    <span class="status" id="gpsStatus">定位中</span>
   </div>
 
-  <button class="control-btn" id="locateBtn" title="回到我的位置">📍</button>
-
   <script>
-    // ========== 固定学校位置 ==========
-    const FIXED_POSITION = [38.38, 117.33];
-    const FIXED_LABEL = "学校";
+    // ********** 修改为你的 Render 域名 **********
+    const BACKEND_URL = 'wss://esp-gps-tracker.onrender.com';
+    // ******************************************
 
-    // 初始化地图，缩放控件放在右上角
-    const map = L.map('map', {
-      center: FIXED_POSITION,
-      zoom: 16,
-      zoomControl: false
-    });
+    const DEVICE_ID = 'device1';
+    const HOME_POS = [38.38, 117.33];   // 沧州交通学院坐标
+
+    // 地图初始化
+    const map = L.map('map', { center: HOME_POS, zoom: 16, zoomControl: false });
     L.control.zoom({ position: 'topright' }).addTo(map);
-
-    // 使用带建筑轮廓的人道主义风格底图
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors, Humanitarian style',
+      attribution: '© OpenStreetMap',
       maxZoom: 19
     }).addTo(map);
 
-    // 学校固定标记
-    L.marker(FIXED_POSITION)
-      .addTo(map)
-      .bindPopup(`<b>${FIXED_LABEL}</b><br>学院西路2009号沧州交通学院`);
+    // 家标记
+    L.marker(HOME_POS).addTo(map).bindPopup('🏡 家');
 
-    // 用户实时位置图标（蓝色圆点）
-    const userIcon = L.divIcon({
-      className: 'user-marker',
-      html: '<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(59,130,246,0.6);"></div>',
-      iconSize: [18,18],
-      iconAnchor: [9,9]
+    // 设备图标
+    const deviceIcon = L.divIcon({
+      html: '<div style="width:18px;height:18px;background:#f97316;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(249,115,22,0.6);"></div>',
+      iconSize: [18,18], iconAnchor: [9,9]
     });
 
-    let userMarker = null;
-    let trailCoords = [];
-    const trailLine = L.polyline([], {
-      color: '#f97316',
-      weight: 4,
-      opacity: 0.8
+    let deviceMarker = null;
+    let trackPoints = [HOME_POS];        // 轨迹起点是家
+    const trackLine = L.polyline(trackPoints, {
+      color: '#f97316', weight: 4, opacity: 0.8
     }).addTo(map);
 
-    const statusEl = document.getElementById('gpsStatus');
+    // 更新状态文字
+    const statusEl = document.getElementById('statusText');
 
-    function setGPSStatus(active) {
-      statusEl.textContent = active ? '定位中' : '未定位';
-      statusEl.className = active ? 'status' : 'status off';
-    }
+    // WebSocket 连接
+    let ws;
+    function connectWebSocket() {
+      ws = new WebSocket(BACKEND_URL);
 
-    // 位置更新回调（带距离过滤，小于5米不记录轨迹）
-    function updatePosition(position) {
-      const { latitude, longitude, speed, accuracy } = position.coords;
-      const newPoint = [latitude, longitude];
+      ws.onopen = () => {
+        statusEl.textContent = '📡 已连接，等待设备上传...';
+      };
 
-      if (trailCoords.length > 0) {
-        const prevPoint = trailCoords[trailCoords.length - 1];
-        const distance = map.distance(prevPoint, newPoint);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_point' && data.deviceId === DEVICE_ID) {
+            const { lat, lng } = data.point;
+            const newPoint = [lat, lng];
 
-        if (distance < 10) {
-          if (userMarker) {
-            userMarker.setLatLng(newPoint);
-          } else {
-            userMarker = L.marker(newPoint, { icon: userIcon }).addTo(map);
+            // 过滤静止漂移：移动不足 1 米不记录
+            const last = trackPoints[trackPoints.length - 1];
+            const dist = map.distance(last, newPoint);
+            if (dist >= 1) {
+              trackPoints.push(newPoint);
+              trackLine.setLatLngs(trackPoints);
+
+              if (!deviceMarker) {
+                deviceMarker = L.marker(newPoint, { icon: deviceIcon }).addTo(map);
+              } else {
+                deviceMarker.setLatLng(newPoint);
+              }
+
+              statusEl.textContent = `📡 实时跟踪中... (${trackPoints.length - 1} 个轨迹点)`;
+            }
           }
-          setGPSStatus(true);
-          return;
-        }
+        } catch (e) { /* 忽略解析错误 */ }
+      };
 
-        if (speed != null && speed < 0.5) {
-          if (userMarker) {
-            userMarker.setLatLng(newPoint);
+      ws.onclose = () => {
+        statusEl.textContent = '📡 连接断开，5秒后重连...';
+        setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    // 页面加载时获取历史轨迹（如果服务器有保存）
+    async function loadHistory() {
+      try {
+        const httpUrl = BACKEND_URL.replace('wss://', 'https://');
+        const res = await fetch(`${httpUrl}/api/trajectory/${DEVICE_ID}`);
+        const data = await res.json();
+        if (data.points && data.points.length > 0) {
+          // 将历史点全部加入，起点仍为家
+          trackPoints = [HOME_POS, ...data.points.map(p => [p.lat, p.lng])];
+          trackLine.setLatLngs(trackPoints);
+          const last = trackPoints[trackPoints.length - 1];
+          if (!deviceMarker) {
+            deviceMarker = L.marker(last, { icon: deviceIcon }).addTo(map);
           } else {
-            userMarker = L.marker(newPoint, { icon: userIcon }).addTo(map);
+            deviceMarker.setLatLng(last);
           }
-          setGPSStatus(true);
-          return;
+          statusEl.textContent = `📡 已加载 ${data.points.length} 个历史点`;
         }
-      }
-
-      if (accuracy != null && accuracy > 20) {
-        if (userMarker) {
-          userMarker.setLatLng(newPoint);
-        } else {
-          userMarker = L.marker(newPoint, { icon: userIcon }).addTo(map);
-        }
-        setGPSStatus(true);
-        return;
-      }
-
-      trailCoords.push(newPoint);
-      trailLine.setLatLngs(trailCoords);
-
-      if (!userMarker) {
-        userMarker = L.marker(newPoint, { icon: userIcon }).addTo(map);
-      } else {
-        userMarker.setLatLng(newPoint);
-      }
-      setGPSStatus(true);
+      } catch (e) { /* 历史加载失败不影响使用 */ }
     }
 
-    // 定位失败处理（不弹窗，仅显示未定位）
-    function handleLocationError(err) {
-      console.warn('定位错误:', err.message);
-      setGPSStatus(false);
-    }
+    // 启动
+    loadHistory();
+    connectWebSocket();
 
-    // 启动位置监听
-    if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition(
-        updatePosition,
-        handleLocationError,
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      setGPSStatus(false);
-    }
-
-    // 右下角按钮：回到我的位置
-    document.getElementById('locateBtn').addEventListener('click', () => {
-      if (trailCoords.length > 0) {
-        const last = trailCoords[trailCoords.length - 1];
-        map.setView(last, map.getZoom(), { animate: true });
-      } else {
-        map.setView(FIXED_POSITION, 16, { animate: true });
-      }
-    });
+    // 每 14 分钟发一个 HTTP 请求，防止 Render 休眠
+    const heartbeatUrl = BACKEND_URL.replace('wss://', 'https://') + '/api/trajectory/' + DEVICE_ID;
+    setInterval(() => {
+      fetch(heartbeatUrl).catch(() => {});
+    }, 14 * 60 * 1000);
   </script>
 </body>
 </html>
